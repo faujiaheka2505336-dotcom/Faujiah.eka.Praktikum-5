@@ -1,4 +1,5 @@
 {{-- Field form bersama. $berita = null saat create, model saat edit. --}}
+{{-- Variabel $kategoris dan $tags dikirim oleh BeritaController::create()/edit(). --}}
 <div class="mb-3">
     <label for="judul" class="form-label fw-semibold">Judul</label>
     <input type="text" name="judul" id="judul" class="form-control @error('judul') is-invalid @enderror"
@@ -8,31 +9,14 @@
 
 <div class="row">
     <div class="col-md-6 mb-3">
-        <label for="kategori" class="form-label fw-semibold">Kategori</label>
-        <select name="kategori" id="kategori" class="form-select @error('kategori') is-invalid @enderror">
+        <label for="kategori_id" class="form-label fw-semibold">Kategori</label>
+        <select name="kategori_id" id="kategori_id" class="form-select @error('kategori_id') is-invalid @enderror">
             <option value="">-- Pilih Kategori --</option>
-            @foreach (\App\Models\Berita::KATEGORI as $k)
-                <option value="{{ $k }}" @selected(old('kategori', $berita?->kategori) == $k)>{{ $k }}</option>
+            @foreach ($kategoris as $k)
+                <option value="{{ $k->id }}" @selected(old('kategori_id', $berita?->kategori_id) == $k->id)>{{ $k->nama }}</option>
             @endforeach
         </select>
-        @error('kategori') <div class="invalid-feedback">{{ $message }}</div> @enderror
-    </div>
-
-    <div class="col-md-6 mb-3">
-        <label for="penulis" class="form-label fw-semibold">Penulis</label>
-        <input type="text" name="penulis" id="penulis" class="form-control @error('penulis') is-invalid @enderror"
-               value="{{ old('penulis', $berita?->penulis ?? 'Admin') }}">
-        @error('penulis') <div class="invalid-feedback">{{ $message }}</div> @enderror
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-6 mb-3">
-        <label for="tags" class="form-label fw-semibold">Tag</label>
-        <input type="text" name="tags" id="tags" class="form-control @error('tags') is-invalid @enderror"
-               value="{{ old('tags', $berita?->tags) }}" placeholder="voli, bola, turnamen">
-        <div class="form-text">Pisahkan dengan koma.</div>
-        @error('tags') <div class="invalid-feedback">{{ $message }}</div> @enderror
+        @error('kategori_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
     </div>
 
     <div class="col-md-6 mb-3">
@@ -45,6 +29,30 @@
     </div>
 </div>
 
+@php
+    // Setelah validasi gagal, pakai centang terakhir dari input pengguna (termasuk bila semua
+    // tag dikosongkan). Selain itu: tag milik berita (edit) atau kosong (create).
+    $tagDipilih = session()->hasOldInput()
+        ? (array) old('tags', [])
+        : ($berita?->tags->pluck('id')->all() ?? []);
+@endphp
+
+<div class="mb-3">
+    <label class="form-label fw-semibold d-block">Tag</label>
+    @forelse ($tags as $tag)
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="tags[]"
+                   id="tag{{ $tag->id }}" value="{{ $tag->id }}"
+                   @checked(in_array($tag->id, $tagDipilih))>
+            <label class="form-check-label" for="tag{{ $tag->id }}">#{{ $tag->nama }}</label>
+        </div>
+    @empty
+        <span class="text-muted small">Belum ada tag.</span>
+    @endforelse
+    @error('tags') <div class="text-danger small">{{ $message }}</div> @enderror
+    @error('tags.*') <div class="text-danger small">{{ $message }}</div> @enderror
+</div>
+
 <div class="mb-3">
     <label for="gambar" class="form-label fw-semibold">Gambar</label>
     @if ($berita?->gambar)
@@ -52,7 +60,7 @@
     @endif
     <input type="file" name="gambar" id="gambar" accept="image/*"
            class="form-control @error('gambar') is-invalid @enderror">
-    <div class="form-text">JPG/PNG/WebP, maksimal 2 MB.{{ $berita?->gambar ? ' Kosongkan jika tidak ingin mengganti.' : '' }}</div>
+    <div class="form-text">JPG, PNG, atau WebP, maksimal 2 MB.{{ $berita?->gambar ? ' Kosongkan jika tidak ingin mengganti.' : '' }}</div>
     @error('gambar') <div class="invalid-feedback">{{ $message }}</div> @enderror
 </div>
 

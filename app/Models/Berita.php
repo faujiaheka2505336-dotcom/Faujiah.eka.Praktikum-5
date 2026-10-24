@@ -4,40 +4,55 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Berita extends Model
 {
-    /** Kategori persis seperti dropdown di jalatrang.id/berita (urut abjad). */
-    public const KATEGORI = [
-        'ekonomi', 'keuangan', 'kunjungan', 'Olahraga', 'pembangunan',
-        'pemuda', 'Pendidikan', 'potensi', 'Prestasi dan Apresiasi',
-        'tidak memiliki kategori',
-    ];
-
     public const PLACEHOLDER = 'https://placehold.co/800x450/0f3460/ffffff?text=Berita+Desa';
 
+    // user_id sengaja tidak masuk $fillable: selalu diisi lewat $user->beritas()->create().
     protected $fillable = [
-        'judul', 'kategori', 'gambar', 'isi', 'tags',
-        'penulis', 'dilihat', 'published_at',
+        'judul', 'kategori_id', 'gambar', 'isi', 'dilihat', 'published_at',
     ];
 
     protected $casts = [
         'published_at' => 'datetime',
     ];
 
+    /** Berita milik satu kategori (pemegang foreign key -> belongsTo). */
+    public function kategori(): BelongsTo
+    {
+        return $this->belongsTo(Kategori::class);
+    }
+
+    /** Berita ditulis oleh satu user (pemegang foreign key -> belongsTo). */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /** Berita punya banyak tag (Many to Many lewat tabel berita_tag). */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class);
+    }
+
     /**
      * Berita::filter($request->only('q', 'kategori', 'tag'))
-     * Semua filter opsional; yang kosong diabaikan oleh when().
+     * 'kategori' dan 'tag' berisi ID. Semua filter opsional; yang kosong diabaikan oleh when().
      */
     public function scopeFilter(Builder $query, array $filters): Builder
     {
         return $query
             ->when($filters['q'] ?? null, fn ($q, $kata) => $q->where('judul', 'like', "%{$kata}%"))
-            ->when($filters['kategori'] ?? null, fn ($q, $kategori) => $q->where('kategori', $kategori))
-            // tags disimpan "a,b,c" -> FIND_IN_SET cocok persis per tag (MySQL)
-            ->when($filters['tag'] ?? null, fn ($q, $tag) => $q->whereRaw('FIND_IN_SET(?, tags)', [$tag]));
+            ->when($filters['kategori'] ?? null, fn ($q, $id) => $q->where('kategori_id', $id))
+            // whereHas lewat relasi: berfungsi di semua database (bukan hanya MySQL)
+            ->when($filters['tag'] ?? null, fn ($q, $id) => $q->whereHas(
+                'tags', fn ($t) => $t->where('tags.id', $id)
+            ));
     }
 
     /** Gambar bisa berupa URL penuh (seeder) atau path upload di disk "public". */
@@ -54,12 +69,6 @@ class Berita extends Model
         return Storage::disk('public')->exists($this->gambar)
             ? asset('storage/' . $this->gambar)
             : self::PLACEHOLDER;
-    }
-
-    /** $berita->tag_list -> ['voli', 'bola', 'turnamen'] */
-    public function getTagListAttribute(): array
-    {
-        return array_values(array_filter(explode(',', (string) $this->tags)));
     }
 
     /** Hapus file gambar hanya bila hasil upload lokal (bukan URL eksternal). */

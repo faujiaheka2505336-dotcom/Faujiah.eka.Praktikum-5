@@ -17,8 +17,8 @@
                 <label for="kategori" class="form-label fw-semibold">Kategori</label>
                 <select id="kategori" name="kategori" class="form-select mb-3">
                     <option value="">Semua Kategori</option>
-                    @foreach (\App\Models\Berita::KATEGORI as $k)
-                        <option value="{{ $k }}" @selected(request('kategori') === $k)>{{ $k }}</option>
+                    @foreach ($kategoris as $k)
+                        <option value="{{ $k->id }}" @selected(request('kategori') == $k->id)>{{ $k->nama }}</option>
                     @endforeach
                 </select>
 
@@ -27,7 +27,9 @@
             </form>
         </div>
 
-        <a href="{{ route('berita.create') }}" class="btn btn-success w-100 mt-3">+ Tambah Berita</a>
+        @auth
+            <a href="{{ route('berita.create') }}" class="btn btn-success w-100 mt-3">+ Tambah Berita</a>
+        @endauth
     </div>
 
     {{-- Daftar berita --}}
@@ -43,7 +45,7 @@
 
                         <div class="card-body d-flex flex-column">
                             <div class="d-flex align-items-center gap-2 mb-2">
-                                <span class="badge badge-kategori">{{ $berita->kategori }}</span>
+                                <span class="badge badge-kategori">{{ $berita->kategori->nama }}</span>
                                 <small class="text-muted">
                                     <i class="bi bi-calendar3"></i> {{ $berita->published_at?->translatedFormat('d M Y') }}
                                 </small>
@@ -58,8 +60,8 @@
                             <p class="text-muted small flex-grow-1">{{ Str::limit(strip_tags($berita->isi), 90) }}</p>
 
                             <div class="mb-2">
-                                @foreach ($berita->tag_list as $tag)
-                                    <a href="{{ route('berita.index', ['tag' => $tag]) }}" class="tag-pill">#{{ $tag }}</a>
+                                @foreach ($berita->tags as $tag)
+                                    <a href="{{ route('berita.index', ['tag' => $tag->id]) }}" class="tag-pill">#{{ $tag->nama }}</a>
                                 @endforeach
                             </div>
 
@@ -70,15 +72,21 @@
                                 </a>
                             </div>
 
-                            <div class="mt-2 pt-2 border-top d-flex gap-2">
-                                <a href="{{ route('berita.edit', $berita) }}" class="btn btn-sm btn-outline-warning">Edit</a>
-                                <form action="{{ route('berita.destroy', $berita) }}" method="POST"
-                                      onsubmit="return confirm('Yakin hapus berita ini?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
-                                </form>
-                            </div>
+                            {{-- Hanya mengatur tampilan; perlindungan sebenarnya ada pada middleware di routes/web.php --}}
+                            @auth
+                                <div class="mt-2 pt-2 border-top d-flex gap-2">
+                                    <a href="{{ route('berita.edit', $berita) }}" class="btn btn-sm btn-outline-warning">Edit</a>
+
+                                    @if (auth()->user()->isAdmin())
+                                        <form action="{{ route('berita.destroy', $berita) }}" method="POST"
+                                              onsubmit="return confirm('Yakin hapus berita ini?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            @endauth
                         </div>
                     </div>
                 </div>
